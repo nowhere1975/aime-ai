@@ -169,6 +169,7 @@ final class AIMEInputController: IMKInputController {
             this.commitPending(client)
             if this.ownsPanel { this.engine.panel.hide() }
             this.engine.usage.flush()
+            TypingLog.flush()
             if this.engine.activeController === this { this.engine.activeController = nil }
         }
         super.deactivateServer(sender)
@@ -226,6 +227,8 @@ final class AIMEInputController: IMKInputController {
         }
         engine.activeController = self
         var handled = false
+        // Typing-process log (opt-in, see TypingLog.swift): state before the key.
+        var keyLog: (wasComposing: Bool, start: (context: String?, ms: Double)?)?
 
         switch event.type {
         case .keyDown:
@@ -282,6 +285,16 @@ final class AIMEInputController: IMKInputController {
                 return false
             }
             engine.cancelStatus()
+            if TypingLog.enabled {
+                var start: (context: String?, ms: Double)?
+                // Read the text before the caret now, while no marked text is in the way.
+                if !isComposing, !session.option("ascii_mode"), TypingLog.mayStartComposition(event) {
+                    let t0 = Date()
+                    let context = TypingLog.leftContext(client)
+                    start = (context, Date().timeIntervalSince(t0) * 1000)
+                }
+                keyLog = (isComposing, start)
+            }
             forwardedToRime = true
             handled = session.processKey(keysym, modifiers: mask)
             // IMK never delivers key-ups. Report the release of each real press (not
@@ -360,6 +373,13 @@ final class AIMEInputController: IMKInputController {
         }
 
         sync(client: client)
+        if let keyLog {
+            let context = session.context()
+            if let start = keyLog.start, context.isComposing {
+                TypingLog.start(app: bundleID, context: start.context, ms: start.ms)
+            }
+            TypingLog.key(event, wasComposing: keyLog.wasComposing, handled: handled, context: context)
+        }
         rememberAsciiMode()
         return handled
     }
@@ -493,6 +513,7 @@ final class AIMEInputController: IMKInputController {
         if let text = session.consumeCommit() {
             DebugLog.write("commit length=\(text.count) hadMarked=\(hasMarkedText) draft=\(draftLayerActive)")
             engine.usage.record(text, app: bundleID)
+            if TypingLog.enabled { TypingLog.commit(text) }
             lastCommitted = text
             // A commit of only punctuation or digits does not open a draft.
             if commitToDraft {
@@ -588,12 +609,14 @@ final class AIMEInputController: IMKInputController {
 
     private func select(_ index: Int) {
         guard let session = liveSession else { return }
+        if TypingLog.enabled { TypingLog.click(index: index) }
         session.selectCandidate(onCurrentPage: index)
         sync(client: textClient)
     }
 
     private func page(backward: Bool) {
         guard let session = liveSession else { return }
+        if TypingLog.enabled { TypingLog.pageClick(backward: backward) }
         session.changePage(backward: backward)
         sync(client: textClient)
     }
