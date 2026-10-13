@@ -1,0 +1,8 @@
+# Personal and derived data never leaves this machine: corpora, typing logs, eval
+# records (they contain the evaluated words), the Rime user-data copy, replay cases.
+data/
+eval/build/
+clt-build/.build/
+clt-build/.release/
+clt-build/dist/
+.venv/
