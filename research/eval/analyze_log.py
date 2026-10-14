@@ -16,6 +16,7 @@ files = sorted(glob.glob(os.path.expanduser("~/Library/AIME/typing-log/*.jsonl")
 events = [json.loads(l) for f in files for l in open(f, encoding="utf-8") if l.strip()]
 
 commits, cur, last_commit = [], None, None
+prev_text, prev_t = "", 0  # previous commit of any kind (to tell where a clause breaks)
 history = ""  # committed text, the fallback context where the app exposes none (terminals)
 for e in events:
     ev = e["ev"]
@@ -43,12 +44,14 @@ for e in events:
             rec = dict(app=cur["app"], ctx=cur["ctx"] if cur["ctx"] else history[-20:], ctx_src="app" if cur["ctx"] else "history",
                        pinyin=s["in"], cands=cands, page=page, text=text, idx=idx,
                        first=(page == 0 and idx == 0), paged=cur["paged"] or page > 0,
-                       pinyin_bs=cur["pinyin_bs"], post_bs=0, nkeys=len(cur["keys"]))
+                       pinyin_bs=cur["pinyin_bs"], post_bs=0, nkeys=len(cur["keys"]),
+                       t=e["t"], gap_ms=e["t"] - prev_t, after_nonhan=not HAN.search(prev_text or "x"))
             rec["picked"] = not rec["first"] and not rec["paged"]
             commits.append(rec); last_commit = rec
         else:
             last_commit = None
         history += text
+        prev_text, prev_t = text, e["t"]
         cur = None
     elif ev == "post" and e["k"] in ("bs", "del") and last_commit is not None:
         last_commit["post_bs"] += 1
