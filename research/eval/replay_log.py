@@ -24,17 +24,11 @@ ap.add_argument("--ctx", type=int, default=16, help="context tokens")
 args = ap.parse_args()
 
 HAN = re.compile(r"^[一-鿿]+$")
-cases = json.load(open(os.path.join(DATA, "replay_cases.json")))
-
 # ---- build intents -------------------------------------------------------------------------
-intents, i = [], 0
-while i < len(cases):
-    c = cases[i]
-    nxt = cases[i + 1] if i + 1 < len(cases) else None
-    if nxt and c["post_bs"] >= len(c["text"]) and nxt["pinyin"] == c["pinyin"]:
-        intents.append(dict(c, gold=nxt["text"], redo=True)); i += 2
-    else:
-        intents.append(dict(c, gold=c["text"], redo=False)); i += 1
+sys.path.insert(0, HERE)
+from intents import load_intents
+cases = json.load(open(os.path.join(DATA, "replay_cases.json")))
+intents = load_intents()
 
 # ---- LM -------------------------------------------------------------------------------------
 import mlx.core as mx
@@ -64,17 +58,9 @@ def lm_scores(ctx, cands):
     return s.tolist()
 
 t0 = time.time()
-prev_word = None
-for it in intents:
-    cands = it["cands"]
-    # rerank only the full-span group: Han candidates as long as RIME's first one
-    group = [k for k, c in enumerate(cands) if HAN.match(c) and len(c) == len(cands[0])]
-    it["group"] = group
-    it["prev"] = prev_word
-    if len(group) > 1:
-        it["lm"] = lm_scores(it["ctx"], [cands[k] for k in group])
-    prev_word = it["gold"]
-for n_, it in enumerate(intents): it["i"] = n_
+for it in intents:  # rerank only the full-span group (see intents.py)
+    if len(it["group"]) > 1:
+        it["lm"] = lm_scores(it["ctx"], [it["cands"][k] for k in it["group"]])
 print(f"scored {len(intents)} intents in {time.time()-t0:.0f}s", file=sys.stderr)
 
 # ---- pick functions -------------------------------------------------------------------------
