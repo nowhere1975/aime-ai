@@ -13,8 +13,14 @@ exec(src.split("# Claude Code prompt history")[0], ns)  # clean() / add() / HAN 
 
 text = open(sys.argv[1], encoding="utf-8").read()
 name = sys.argv[2] if len(sys.argv) > 2 else "personal_chat.json"
-for part in re.split(r"^\*\*\[\d\d:\d\d\]\*\*\s*", text, flags=re.M)[1:]:
-    ns["add"]("chat", re.split(r"^## \d{4}-\d\d-\d\d", part, flags=re.M)[0].strip())
+from datetime import datetime
+day = hm = None
+for tok in re.split(r"^(## \d{4}-\d\d-\d\d|\*\*\[\d\d:\d\d\]\*\*)", text, flags=re.M)[1:]:
+    if tok.startswith("## "): day = tok[3:].strip(); continue
+    if tok.startswith("**["): hm = tok[3:8]; continue
+    if hm is None: continue
+    ts = datetime.strptime(f"{day} {hm}", "%Y-%m-%d %H:%M").timestamp() if day else None  # local time
+    ns["add"]("chat", tok.strip(), ts)
 dest = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", name)
 json.dump(ns["out"], open(dest, "w"), ensure_ascii=False)
 print(len(ns["out"]), "messages,", sum(len(ns["HAN"].findall(o["text"])) for o in ns["out"]), "Han chars ->", dest)

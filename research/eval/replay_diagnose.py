@@ -6,7 +6,6 @@ right-ctx : would the LM pick the right candidate if it could also see the *next
             (what a revisable draft could do), vs. left context only.
 """
 import json, os, re, sys
-sys.argv = [sys.argv[0]]
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "replay_log.py")).read().split("# ---- pick functions")[0])
 
 last_choice = {}

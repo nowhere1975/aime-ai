@@ -2,3 +2,4 @@ mlx-lm==0.32.0
 pypinyin
 jieba
 httpx[socks]
+zstandard

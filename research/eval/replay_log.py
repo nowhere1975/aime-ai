@@ -21,6 +21,7 @@ DATA = os.path.join(HERE, "..", "data")
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="mlx-community/Qwen3-0.6B-8bit")
 ap.add_argument("--ctx", type=int, default=16, help="context tokens")
+ap.add_argument("--adapter", default=None, help="LoRA adapter dir (e.g. data/ft/adapters_q06b8)")
 args = ap.parse_args()
 
 HAN = re.compile(r"^[一-鿿]+$")
@@ -34,7 +35,7 @@ intents = load_intents()
 import mlx.core as mx
 from mlx_lm import load
 from mlx_lm.models.cache import make_prompt_cache, KVCache
-model, tok = load(args.model)
+model, tok = load(args.model, adapter_path=args.adapter)
 
 def lm_scores(ctx, cands):
     ids = tok.encode("\n" + (ctx or ""))[-args.ctx:]
