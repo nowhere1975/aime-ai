@@ -73,7 +73,8 @@ enum TypingLog {
         }
     }
 
-    static func key(_ event: NSEvent, wasComposing: Bool, handled: Bool, context: RimeContextSnapshot) {
+    static func key(_ event: NSEvent, wasComposing: Bool, handled: Bool, context: RimeContextSnapshot,
+                    rankedIndex: Int? = nil) {
         let composing = context.isComposing
         if wasComposing || composing {
             var obj: [String: Any] = ["ev": "key", "k": keyName(event), "h": handled, "c0": wasComposing]
@@ -83,6 +84,7 @@ enum TypingLog {
                 obj["pg"] = context.pageNumber
                 obj["hl"] = context.highlightedIndex
                 obj["cands"] = context.candidates.map(\.text)
+                if let rankedIndex { obj["rk"] = rankedIndex } // highlight moved by Ranker
             }
             write(obj)
         } else if afterCommit > 0 {

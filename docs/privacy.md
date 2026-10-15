@@ -31,6 +31,15 @@
 - 系统安全输入（密码框）开启时一律不写。
 - 实现见 `Apps/AIME/TypingLog.swift`；分析脚本见 `research/eval/analyze_log.py`。
 
+## 上下文选字（本 fork 新增，研究原型，可选，默认关闭）
+
+- 打开：运行本机服务 `research/ranker/run.sh`，并 `touch ~/Library/AIME/ranker/ENABLED`；删除 `ENABLED` 即停止。
+- 每次输入变化时，输入法把**光标前最多 20 个字**（读不到时用最近上屏的内容）、上一个词和当前页候选，通过本机 Unix socket
+  （`~/Library/AIME/ranker/ranker.sock`，仅本人可访问）发给服务；服务用本地小模型（MLX）打分，回复应高亮的候选序号。
+  上屏的词也会告诉服务，用于个人搭配统计（`~/Library/AIME/ranker/bigrams.json`，0600）。不联网、不上传。
+- 系统安全输入（密码框）开启时不发送。服务未运行或 50ms 内无回复，就用 RIME 原排序。
+- 实现见 `Apps/AIME/Ranker.swift`、`research/ranker/server.py`。
+
 ## 输入统计（可选，默认关闭）
 
 - 在「设置 › 输入统计」中打开后，输入法才会计数；关闭即停止并丢弃内存中尚未写入的计数。

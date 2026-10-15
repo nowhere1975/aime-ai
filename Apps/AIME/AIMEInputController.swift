@@ -34,6 +34,14 @@ final class AIMEInputController: IMKInputController {
     var recentText = RecentText()
     /// Text of the latest commit (see `commitForAction`).
     private var lastCommitted = ""
+    /// Context-aware ranking (opt-in, see Ranker.swift): text before the caret when the
+    /// composition started, recent commits as a fallback (terminals expose no text), the
+    /// previous word, and the input already ranked (so arrows and paging stay the user's).
+    private var compositionContext: String?
+    private var recentCommits = ""
+    private var previousWord = ""
+    private var lastRankedInput: String?
+    private var rankedIndex: Int?
     private var draftTimer: Task<Void, Never>?
     /// Page depth and symbol category last drawn, to pick the menu's transition direction.
     var menuShown: (depth: Int, category: Int) = (0, 0)
@@ -285,15 +293,17 @@ final class AIMEInputController: IMKInputController {
                 return false
             }
             engine.cancelStatus()
-            if TypingLog.enabled {
+            let logging = TypingLog.enabled
+            if logging || Ranker.enabled {
                 var start: (context: String?, ms: Double)?
                 // Read the text before the caret now, while no marked text is in the way.
                 if !isComposing, !session.option("ascii_mode"), TypingLog.mayStartComposition(event) {
                     let t0 = Date()
                     let context = TypingLog.leftContext(client)
                     start = (context, Date().timeIntervalSince(t0) * 1000)
+                    compositionContext = context
                 }
-                keyLog = (isComposing, start)
+                if logging { keyLog = (isComposing, start) }
             }
             forwardedToRime = true
             handled = session.processKey(keysym, modifiers: mask)
@@ -378,7 +388,8 @@ final class AIMEInputController: IMKInputController {
             if let start = keyLog.start, context.isComposing {
                 TypingLog.start(app: bundleID, context: start.context, ms: start.ms)
             }
-            TypingLog.key(event, wasComposing: keyLog.wasComposing, handled: handled, context: context)
+            TypingLog.key(event, wasComposing: keyLog.wasComposing, handled: handled, context: context,
+                          rankedIndex: context.isComposing ? rankedIndex : nil)
         }
         rememberAsciiMode()
         return handled
@@ -514,6 +525,13 @@ final class AIMEInputController: IMKInputController {
             DebugLog.write("commit length=\(text.count) hadMarked=\(hasMarkedText) draft=\(draftLayerActive)")
             engine.usage.record(text, app: bundleID)
             if TypingLog.enabled { TypingLog.commit(text) }
+            recentCommits = String((recentCommits + text).suffix(20))
+            if text.unicodeScalars.allSatisfy({ (0x4E00...0x9FFF).contains($0.value) }) {
+                if Ranker.enabled { Ranker.commit(previous: previousWord, text: text) }
+                previousWord = text
+            } else {
+                previousWord = ""
+            }
             lastCommitted = text
             // A commit of only punctuation or digits does not open a draft.
             if commitToDraft {
@@ -529,8 +547,10 @@ final class AIMEInputController: IMKInputController {
             }
         }
 
-        let context = session.context()
+        var context = session.context()
         isComposing = context.isComposing
+        if !isComposing { lastRankedInput = nil; rankedIndex = nil }
+        else if Ranker.enabled { context = applyRanking(session, context) }
         let theme = engine.panel.theme
         let inline = appOptions.inline ?? theme.inlinePreedit
 
@@ -605,6 +625,22 @@ final class AIMEInputController: IMKInputController {
         engine.panel.view.onPage = { [weak self] backward in self?.page(backward: backward) }
         engine.panel.view.forcePreedit = !inline
         engine.panel.show(state, at: cursorRect(client: client))
+    }
+
+    /// Moves RIME's highlight to the candidate the ranker prefers. Once per input string, only
+    /// on the first page while RIME still highlights its own first candidate.
+    private func applyRanking(_ session: RimeSession, _ context: RimeContextSnapshot) -> RimeContextSnapshot {
+        guard context.pageNumber == 0, context.highlightedIndex == 0, context.candidates.count > 1,
+              context.input != lastRankedInput else { return context }
+        lastRankedInput = context.input
+        rankedIndex = nil
+        let before = compositionContext.flatMap { $0.isEmpty ? nil : $0 } ?? recentCommits
+        guard let index = Ranker.rank(context: before, previous: previousWord,
+                                      candidates: context.candidates.map(\.text)),
+              index > 0, index < context.candidates.count,
+              session.highlightCandidate(onCurrentPage: index) else { return context }
+        rankedIndex = index
+        return session.context()
     }
 
     private func select(_ index: Int) {
