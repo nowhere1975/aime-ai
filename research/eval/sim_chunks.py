@@ -10,7 +10,8 @@ Same static RIME copy (user dictionary from before the log, no learning during t
   chunk        : the joined pinyin queried once (corrections ≈ words of gold the first
                  candidate gets wrong)
 Engines: `moqi` = the schema as installed (zh-moqi.gram, 7 MB); `wanxiang` = same schema
-with wanxiang-lts-zh-hans.gram (400 MB) and Wanxiang's own grammar settings.
+with wanxiang-lts-zh-hans.gram (400 MB) and Wanxiang's own grammar settings; `wx_scheme` =
+the complete 万象 base scheme (its dictionary + grammar) with an empty user dictionary.
 Optional `--lm`: rerank the chunk's full-span candidates with the LM (+ RIME rank).
 
 Usage: sim_chunks.py [--sizes 2 3 4] [--lm]
@@ -52,9 +53,16 @@ def engine_dir(name):
             open(os.path.join(d, "rime_frost.custom.yaml"), "w").write(WX_PATCH)
     return d
 
+WX_SHARED = os.path.join(DATA, "schemes", "wanxiang_base")
+
 class Rime:
     def __init__(self, name):
-        self.p = subprocess.Popen([os.path.join(HERE, "build", "rime_cands"), SHARED, engine_dir(name), "rime_frost"],
+        if name == "wx_scheme":  # the full 万象 scheme (its own dictionary + grammar), empty user dict
+            user = os.path.join(DATA, "sim_wx_scheme"); shutil.rmtree(user, ignore_errors=True); os.makedirs(user)
+            cmd = [os.path.join(HERE, "build", "rime_cands"), WX_SHARED, user, "wanxiang"]
+        else:
+            cmd = [os.path.join(HERE, "build", "rime_cands"), SHARED, engine_dir(name), "rime_frost"]
+        self.p = subprocess.Popen(cmd,
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
         self.cache = {}
     def cands(self, py):
@@ -99,7 +107,7 @@ def word_errors(first, words):
 
 ABBR = lambda py: not any(v in py for v in "aeiouv") or py[-1] not in "aeiouvng"
 
-engines = {name: Rime(name) for name in ("moqi", "wanxiang")}
+engines = {name: Rime(name) for name in ("moqi", "wanxiang", "wx_scheme")}
 
 lm = None
 if args.lm:

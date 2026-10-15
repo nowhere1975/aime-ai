@@ -3,6 +3,8 @@
 // stdout: candidates for that input, tab-separated, one line per input (up to MAX_CANDS)
 // Composition is cleared after each query, nothing is committed, so the user dictionary
 // is not trained by the eval.
+// "!pinyin<TAB>text" instead commits `text` from the candidates of `pinyin` (so the user
+// dictionary learns, as when typing); replies "ok" or "miss".
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +42,32 @@ int main(int argc, char **argv) {
   while (fgets(line, sizeof line, stdin)) {
     line[strcspn(line, "\r\n")] = 0;
     api->clear_composition(s);
+    if (line[0] == '!') {
+      char *tab = strchr(line, '\t');
+      int found = 0;
+      if (tab) {
+        *tab = 0;
+        api->set_input(s, line + 1);
+        RimeCandidateListIterator it = {0};
+        size_t idx = 0;
+        if (api->candidate_list_begin(s, &it)) {
+          while (api->candidate_list_next(&it) && idx < 200) {
+            if (strcmp(it.candidate.text, tab + 1) == 0) { found = 1; break; }
+            idx++;
+          }
+          api->candidate_list_end(&it);
+        }
+        if (found) {
+          api->select_candidate(s, idx);
+          RIME_STRUCT(RimeCommit, commit);
+          if (api->get_commit(s, &commit)) api->free_commit(&commit);
+        }
+      }
+      api->clear_composition(s);
+      puts(found ? "ok" : "miss");
+      fflush(stdout);
+      continue;
+    }
     if (*line) api->set_input(s, line);
     RimeCandidateListIterator it = {0};
     int n = 0;

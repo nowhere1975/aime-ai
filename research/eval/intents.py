@@ -2,6 +2,7 @@
 
 A commit deleted right away (⌫ ≥ its length) and followed by the same pinyin is merged
 with that retry: gold = the retry's text, candidates = the first attempt's page.
+Deleted and followed by different pinyin (typo / change of mind): dropped.
 `group` = indexes of the full-span candidates (Han, same length as RIME's first) that a
 reranker may reorder; `prev` = the previous intent's gold text.
 """
@@ -18,6 +19,11 @@ def load_intents(path=os.path.join(DATA, "replay_cases.json")):
         nxt = cases[i + 1] if i + 1 < len(cases) else None
         if nxt and c["post_bs"] >= len(c["text"]) and nxt["pinyin"] == c["pinyin"]:
             intents.append(dict(c, gold=nxt["text"], redo=True)); i += 2
+        elif nxt and c["post_bs"] >= len(c["text"]):
+            # deleted and retyped with other pinyin (a pinyin typo such as yixai→yixia, or a
+            # change of mind): not a ranking error, and the committed text is not what was
+            # wanted, so leave it out
+            i += 1
         else:
             intents.append(dict(c, gold=c["text"], redo=False)); i += 1
     prev = None
