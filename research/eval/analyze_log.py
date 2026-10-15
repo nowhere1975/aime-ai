@@ -41,9 +41,11 @@ for e in events:
             cands, page = s["cands"], s.get("pg", 0)
             idx = cands.index(text) if text in cands else None
             first_idx = cur["snaps"][-1]["cands"][0] if cands else None
+            rk = s.get("rk")  # the ranker moved the highlight here (see Apps/AIME/Ranker.swift)
+            shown = rk if rk is not None else 0  # what Space would have committed
             rec = dict(app=cur["app"], ctx=cur["ctx"] if cur["ctx"] else history[-20:], ctx_src="app" if cur["ctx"] else "history",
-                       pinyin=s["in"], cands=cands, page=page, text=text, idx=idx,
-                       first=(page == 0 and idx == 0), paged=cur["paged"] or page > 0,
+                       pinyin=s["in"], cands=cands, page=page, text=text, idx=idx, rk=rk,
+                       first=(page == 0 and idx == shown), paged=cur["paged"] or page > 0,
                        pinyin_bs=cur["pinyin_bs"], post_bs=0, nkeys=len(cur["keys"]),
                        t=e["t"], gap_ms=e["t"] - prev_t, after_nonhan=not HAN.search(prev_text or "x"))
             rec["picked"] = not rec["first"] and not rec["paged"]
@@ -67,6 +69,14 @@ print(f"选非首选 (选错候选) {sum(c['picked'] for c in commits)/n:.1%}   
 print(f"翻页               {sum(c['paged'] for c in commits)/n:.1%}   = {per100('paged'):.1f} 次/百字")
 print(f"上屏后退格          {sum(1 for c in commits if c['post_bs'])/n:.1%}   = {per100('post_bs'):.1f} 次/百字")
 print(f"改拼音(组字中退格)  {sum(1 for c in commits if c['pinyin_bs'])/n:.1%}")
+ranked = [c for c in commits if c.get("rk") is not None]
+if ranked:
+    helped = [c for c in ranked if c["idx"] == c["rk"]]
+    hurt = [c for c in ranked if c["idx"] == 0]
+    print(f"模型调整高亮 {len(ranked)} 次：帮上忙 {len(helped)}（不调整就要手选），帮倒忙 {len(hurt)}（本来首选就对），"
+          f"其他 {len(ranked)-len(helped)-len(hurt)}")
+    print("  帮上忙:", ", ".join(f"{c['pinyin']}:{c['cands'][0]}→{c['text']}" for c in helped[:20]))
+    print("  帮倒忙:", ", ".join(f"{c['pinyin']}:{c['cands'][c['rk']]}✗{c['text']}" for c in hurt[:20]))
 print("上下文来源:", Counter(c["ctx_src"] for c in commits), " apps:", Counter(c["app"] for c in commits).most_common(5))
 print("选非首选的例子:", ", ".join(f"{c['pinyin']}:{c['cands'][0]}→{c['text']}(#{c['idx']+1 if c['idx'] is not None else '?'})" for c in commits if c["picked"])[:600])
 json.dump(commits, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "replay_cases.json"), "w"), ensure_ascii=False)
