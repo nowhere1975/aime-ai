@@ -21,6 +21,7 @@ ap.add_argument("--ctx", type=int, default=16)
 ap.add_argument("--lam1", type=float, default=2.0, help="RIME-rank weight, single-character words")
 ap.add_argument("--lam", type=float, default=2.0, help="RIME-rank weight, longer words")
 ap.add_argument("--mu", type=float, default=4.0, help="bonus when (prev, cand) was committed before")
+ap.add_argument("--cache-mb", type=int, default=256, help="cap on MLX's GPU buffer cache")
 ap.add_argument("--dir", default=os.path.expanduser("~/Library/AIME/ranker"))
 args = ap.parse_args()
 
@@ -59,6 +60,9 @@ def save_history():
 import mlx.core as mx
 from mlx_lm import load
 from mlx_lm.models.cache import make_prompt_cache, KVCache
+# MLX keeps freed GPU buffers for reuse; unbounded, that grew to >4 GB after a few hundred
+# keystrokes. A small cap keeps the hot shapes cached.
+mx.set_cache_limit(args.cache_mb << 20)
 model, tok = load(args.model, adapter_path=args.adapter)
 log(f"model {args.model} adapter={args.adapter}")
 
