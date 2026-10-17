@@ -46,6 +46,8 @@ rm -rf "$HERE/dist"; mkdir -p "$HERE/dist"
 APP="$HERE/dist/AIME.app"
 ditto "$REL/AIME.app" "$APP"
 cp "$BIN" "$APP/Contents/MacOS/AIME"
+# MENU_ICON=bookmark: the input-menu icon from before 0.1.6 (upstream switched it to 「艾」)
+[[ "${MENU_ICON:-}" == bookmark ]] && cp "$HERE/AIME-bookmark.pdf" "$APP/Contents/Resources/AIME.pdf"
 /usr/libexec/PlistBuddy -c "Add :AIMEResearchBuild string $(git -C "$ROOT" rev-parse --short HEAD)" "$APP/Contents/Info.plist"
 xattr -cr "$APP"
 codesign --force --sign - --entitlements "$ROOT/Apps/AIME/AIME.entitlements" "$APP"
