@@ -9,12 +9,16 @@
 做法是"只排序、不生成"：RIME 照常给出候选，本地小语言模型按 `log P(候选 | 光标前文字)` 打分，
 与 RIME 自己的排名融合后重排。完全离线，模型跑在 Apple Silicon（MLX）上。
 
+**完整经过和结论见 [`REPORT.md`](REPORT.md)。**
+
 ## 目录
 
 | 路径 | 内容 |
 |---|---|
 | `bench/` | 速度基准：每次按键给一页候选打分要多久（`bench_fast.py`），小样例准确率（`bench_rerank.py`） |
 | `eval/` | 离线评测：librime 驱动 `rime_cands.c`、评测主程序 `run_eval.py`、语料准备、打字日志分析 `analyze_log.py` |
+| `ranker/` | 线上打分服务（`server.py`）、启动脚本 `run.sh`、登录自启 `install-agent.sh`、延迟测试 `bench_client.py` |
+| `tinylm/` | 自训字级小模型：语料处理 `prepare.py`、训练 `train.py`、模型与打分 `model.py` |
 | `clt-build/` | 不装 Xcode 用命令行工具构建 AIME（`build.sh`） |
 | `results/` | 实验记录（只含汇总数字，不含个人文字） |
 | `data/` | **不提交**：语料、个人文字、打字日志派生数据、评测记录、RIME 用户数据副本 |
@@ -55,8 +59,8 @@ python3 research/eval/analyze_log.py      # 首选命中率、选非首选 / 翻
 
 ## 现状
 
-见 `results/`。一句话：速度够（每次按键打分 p50 约 10–14ms），公开语料上首选错误减少约一半，
-在用户自己的文字上减少 15–35%；剩下的错误主要是"的/得/地"类虚词和用户领域专用词，后者需要从用户历史学习。
+见 `REPORT.md` 与 `results/`。一句话：已接入 AIME 并在真实使用中把需要纠正的词从 8.3% 降到 4.3%；
+线上模型是自训的 13.7M 参数字级小模型（服务内存约 145MB），效果与微调后的 Qwen3-0.6B 打平。
 
 相关项目：[rime-llm-ime](https://github.com/zhanghaozhecn/rime-llm-ime)（Windows，同路线，最完整）、
 [azooKey Zenzai](https://zenn.dev/azookey/articles/ea15bacf81521e)（日文，神经网络直接转换）。
