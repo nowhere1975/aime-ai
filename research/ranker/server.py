@@ -8,7 +8,7 @@ Scoring (see research/eval/replay_log.py): among the full-span candidates (Han, 
 RIME's first), score = log P(cand | ctx) − λ·log(1+rank) + μ·[(prev, cand) committed before].
 Nothing leaves the Mac; the model runs with MLX.
 
-Usage: server.py [--model DIR] [--adapter DIR] [--lam1 2] [--lam 2] [--mu 4]
+Usage: server.py [--model DIR] [--adapter DIR] [--tiny DIR] [--lam1 2] [--lam 2] [--mu 4]
 (a fused model dir — `mlx_lm fuse` — is faster than base + adapter)
 """
 import argparse, glob, json, math, os, re, socket, sys, time
@@ -17,6 +17,7 @@ from collections import defaultdict
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="mlx-community/Qwen3-0.6B-8bit")
 ap.add_argument("--adapter", default=None)
+ap.add_argument("--tiny", default=None, help="tinylm model dir (research/tinylm) instead of --model")
 ap.add_argument("--ctx", type=int, default=16)
 ap.add_argument("--lam1", type=float, default=2.0, help="RIME-rank weight, single-character words")
 ap.add_argument("--lam", type=float, default=2.0, help="RIME-rank weight, longer words")
@@ -58,13 +59,14 @@ def save_history():
 
 # ---- model ----------------------------------------------------------------------------------
 import mlx.core as mx
-from mlx_lm import load
-from mlx_lm.models.cache import make_prompt_cache, KVCache
 # MLX keeps freed GPU buffers for reuse; unbounded, that grew to >4 GB after a few hundred
 # keystrokes. A small cap keeps the hot shapes cached.
 mx.set_cache_limit(args.cache_mb << 20)
-model, tok = load(args.model, adapter_path=args.adapter)
-log(f"model {args.model} adapter={args.adapter}")
+if not args.tiny:  # (mlx_lm pulls in transformers: ~100 MB more, so only when needed)
+    from mlx_lm import load
+    from mlx_lm.models.cache import make_prompt_cache, KVCache
+    model, tok = load(args.model, adapter_path=args.adapter)
+    log(f"model {args.model} adapter={args.adapter}")
 
 _ctx_key, _ctx_state = None, None
 _ctx_miss = False  # whether the last rank had to compute its context (for diagnostics)
@@ -102,6 +104,13 @@ def lm_scores(ctx, cands):
     lp = mx.take_along_axis(allp, tid[..., None], -1)[..., 0] - mx.logsumexp(allp, -1)
     s = (lp * msk).sum(-1); mx.eval(s)
     return s.tolist()[:n_real]
+
+if args.tiny:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tinylm"))
+    from model import Scorer
+    lm_scores = Scorer(args.tiny)  # fast enough to need no context cache or prefill
+    context_state = lambda ctx: None
+    log(f"tinylm {args.tiny}")
 
 _last_ctx = ""
 def rank(req):
