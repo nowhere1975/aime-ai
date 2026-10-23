@@ -18,6 +18,28 @@
   请求不带任何输入内容、配置或设备标识，服务器只能看到普通的网络请求信息（IP、时间、系统 User-Agent）。
   可在「设置 › 概览」底部关闭「自动检查更新」。
 
+## 打字过程日志（本 fork 新增，可选，默认关闭）
+
+> 仅 `ai-ranking` 分支的研究构建包含此功能，官方 AIME 没有。用于研究候选排序（选错候选、翻页、上屏后删除的频率），
+> 与上文「不写输入日志」的原则不同，所以只在你手动打开时记录。
+
+- 打开：`mkdir -p ~/Library/AIME/typing-log && touch ~/Library/AIME/typing-log/ENABLED`；删除 `ENABLED` 即停止（1 秒内生效）。
+- 记录内容（`~/Library/AIME/typing-log/<日期>.jsonl`，目录 0700、文件 0600，不上传）：
+  - 每次开始组字时，光标前最多 20 个字（应用不提供时为空，如终端）和应用 Bundle ID；
+  - 组字过程中的每个按键、当时的拼音串、当前页候选、页码和高亮位置；上屏的文字；
+  - 上屏后的 8 个按键**只记类型**（退格 / 方向键 / 其他），不记字符。组字之外打的字不记录。
+- 系统安全输入（密码框）开启时一律不写。
+- 实现见 `Apps/AIME/TypingLog.swift`；分析脚本见 `research/eval/analyze_log.py`。
+
+## 上下文选字（本 fork 新增，研究原型，可选，默认关闭）
+
+- 打开：运行本机服务 `research/ranker/run.sh`，并 `touch ~/Library/AIME/ranker/ENABLED`；删除 `ENABLED` 即停止。
+- 每次输入变化时，输入法把**光标前最多 20 个字**（读不到时用最近上屏的内容）、上一个词和当前页候选，通过本机 Unix socket
+  （`~/Library/AIME/ranker/ranker.sock`，仅本人可访问）发给服务；服务用本地小模型（MLX）打分，回复应高亮的候选序号。
+  上屏的词也会告诉服务，用于个人搭配统计（`~/Library/AIME/ranker/bigrams.json`，0600）。不联网、不上传。
+- 系统安全输入（密码框）开启时不发送。服务未运行或 50ms 内无回复，就用 RIME 原排序。
+- 实现见 `Apps/AIME/Ranker.swift`、`research/ranker/server.py`。
+
 ## 输入统计（可选，默认关闭）
 
 - 在「设置 › 输入统计」中打开后，输入法才会计数；关闭即停止并丢弃内存中尚未写入的计数。
