@@ -9,7 +9,7 @@
 做法是"只排序、不生成"：RIME 照常给出候选，本地小语言模型按 `log P(候选 | 光标前文字)` 打分，
 与 RIME 自己的排名融合后重排。完全离线，模型跑在 Apple Silicon（MLX）上。
 
-**完整经过和结论见 [`REPORT.md`](REPORT.md)。**
+**完整经过和结论见 [`REPORT.md`](REPORT.md)；当前状态和下次从哪继续见 [`DEVLOG.md`](DEVLOG.md)。**
 
 ## 目录
 
