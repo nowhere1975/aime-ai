@@ -17,7 +17,7 @@
 |---|---|
 | `bench/` | 速度基准：每次按键给一页候选打分要多久（`bench_fast.py`），小样例准确率（`bench_rerank.py`） |
 | `eval/` | 离线评测：librime 驱动 `rime_cands.c`、评测主程序 `run_eval.py`、语料准备、打字日志分析 `analyze_log.py` |
-| `ranker/` | 线上打分服务（`server.py`）、启动脚本 `run.sh`、登录自启 `install-agent.sh`、延迟测试 `bench_client.py` |
+| `ranker/` | 线上打分服务（`server.py`）、启动脚本 `run.sh`、登录自启 `install-agent.sh`、部署到另一台 Mac `deploy-remote.sh`、延迟测试 `bench_client.py` |
 | `tinylm/` | 自训字级小模型：语料处理 `prepare.py`、训练 `train.py`、模型与打分 `model.py` |
 | `clt-build/` | 不装 Xcode 用命令行工具构建 AIME（`build.sh`） |
 | `results/` | 实验记录（只含汇总数字，不含个人文字） |
