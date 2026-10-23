@@ -46,6 +46,7 @@ research/.venv/bin/python research/eval/run_eval.py --corpus personal.json --ctx
 # 3. 打字过程日志（装了本分支构建后）
 mkdir -p ~/Library/AIME/typing-log && touch ~/Library/AIME/typing-log/ENABLED
 python3 research/eval/analyze_log.py      # 首选命中率、选非首选 / 翻页 / 上屏后退格 次/百字
+bash research/eval/pull-logs.sh nowhere@192.168.2.73   # 在另一台 Mac 上打字时：先拉回它的日志，analyze_log 会一并统计
 ```
 
 ## 评测方法

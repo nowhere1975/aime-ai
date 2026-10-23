@@ -1,4 +1,5 @@
-"""Typing-process metrics from AIME's typing log (~/Library/AIME/typing-log/*.jsonl).
+"""Typing-process metrics from AIME's typing log (~/Library/AIME/typing-log/*.jsonl, plus other
+Macs' logs pulled into research/data/typing-log/<host>/ by pull-logs.sh).
 
 Per commit (Chinese words only) it reconstructs what the user had to do:
   first    : the committed text was the first candidate on page 0 of the last shown list
@@ -12,7 +13,10 @@ import glob, json, os, re, sys
 from collections import Counter
 
 HAN = re.compile(r"[一-鿿]")
-files = sorted(glob.glob(os.path.expanduser("~/Library/AIME/typing-log/*.jsonl")))
+# this Mac's log, then each other Mac's log as pulled by eval/pull-logs.sh into data/typing-log/<host>/
+DIRS = [os.path.expanduser("~/Library/AIME/typing-log")] + sorted(
+    glob.glob(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "typing-log", "*")))
+files = [f for d in DIRS for f in sorted(glob.glob(os.path.join(d, "*.jsonl")))]
 events = [json.loads(l) for f in files for l in open(f, encoding="utf-8") if l.strip()]
 
 commits, cur, last_commit = [], None, None
